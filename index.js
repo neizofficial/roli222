@@ -53,19 +53,33 @@ function saveNotified() {
 async function checkFreeUGC() {
   try {
     const res = await axios
-      .get("https://www.rolimons.com/api/free-limiteds", { timeout: 10000 })
+      .get("https://catalog.roblox.com/v1/search/items/details", {
+        params: {
+          salesTypeFilter: 1, // items currently for sale
+          minPrice: 0,
+          maxPrice: 0,
+          limit: 30,
+          sortType: 6 // RecentlyCreated
+        },
+        timeout: 10000
+      })
       .catch((e) => {
-        console.error("Error fetching free-limiteds:", e.message);
+        console.error("Error fetching catalog items:", e.message);
         return null;
       });
 
-    if (!res?.data) return;
+    if (!res?.data?.data) return;
 
-    const items = res.data.freeLimiteds || [];
+    // Only genuinely limited items: free (price 0) AND a capped total quantity.
+    // Ordinary permanent free items (e.g. default emotes) report totalQuantity: 0.
+    const items = res.data.data.filter(
+      (item) => item.price === 0 && item.totalQuantity > 0
+    );
+
     let addedAny = false;
 
     for (const item of items) {
-      const id = item.assetId.toString();
+      const id = item.id.toString();
       if (notifiedItems.has(id)) continue;
 
       notifiedItems.add(id);
@@ -84,8 +98,8 @@ async function checkFreeUGC() {
               url: `https://www.roblox.com/catalog/${id}`,
               color: 0x00ff00,
               fields: [
-                { name: "Stock", value: item.remainingStock || "Limited", inline: true },
-                { name: "From", value: "Rolimons", inline: true }
+                { name: "Quantity", value: item.totalQuantity.toString(), inline: true },
+                { name: "From", value: "Roblox Catalog", inline: true }
               ],
               image: { url: img },
               footer: { text: `ID: ${id}` },
